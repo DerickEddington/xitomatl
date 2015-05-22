@@ -2,7 +2,7 @@
 ;; Copyright 2009 Derick Eddington.  My MIT-style license is in the file named
 ;; LICENSE from the original collection this file is distributed with.
 
-(library (xitomatl fmt pretty (0 7))
+(library (xitomatl fmt pretty (0 8))
   (export
     fmt-shares
     fmt-set-shares!
@@ -34,7 +34,7 @@
     (only (srfi :1 lists) length+)
     (only (srfi :13 strings) string-prefix? string-suffix?)
     (xitomatl include)
-    (xitomatl fmt base (0 7))
+    (xitomatl fmt base (0 8))
     (only (srfi :69 basic-hash-tables) hash-table-walk))
 
   (include/resolve ("xitomatl" "fmt") "fmt-pretty.scm")  

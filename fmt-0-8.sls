@@ -2,7 +2,7 @@
 ;; Copyright 2009 Derick Eddington.  My MIT-style license is in the file named
 ;; LICENSE from the original collection this file is distributed with.
 
-(library (xitomatl fmt (0 7))
+(library (xitomatl fmt (0 8))
   (export
     new-fmt-state
     fmt fmt-start fmt-if fmt-capture fmt-let fmt-bind fmt-null
@@ -27,7 +27,7 @@
     make-space make-nl-space display-to-string write-to-string
     fmt-columns columnar line-numbers)
   (import
-    (xitomatl fmt base (0 7))
-    (xitomatl fmt pretty (0 7))
-    (xitomatl fmt column (0 7)))
+    (xitomatl fmt base (0 8))
+    (xitomatl fmt pretty (0 8))
+    (xitomatl fmt column (0 8)))
 )

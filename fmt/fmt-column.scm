@@ -1,6 +1,6 @@
 ;;;; fmt-block.scm -- columnar formatting
 ;;
-;; Copyright (c) 2006-2009 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2006-2011 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 
@@ -104,7 +104,12 @@
          ((deq!) #f))))))
 
 (define (columnar . ls)
-  (define (proportional-width? w) (and (number? w) (< 0 w 1)))
+  (define (proportional-width? w)
+    (and (number? w)
+         (or (< 0 w 1)
+             (and (inexact? w) (= w 1.0)))))
+  (define (whitespace-pad? st)
+    (char-whitespace? (or (fmt-pad-char st) #\space)))
   (define (build-column ls)
     (let-optionals* ls ((fixed-width #f)
                         (width #f)
@@ -117,35 +122,40 @@
       (define (scale-width st)
         (max 1 (inexact->exact
                 (truncate (* width (- (fmt-width st) fixed-width))))))
+      (define (padder)
+        (if (proportional-width? width)
+            (case align
+              ((right)
+               (lambda (str) (lambda (st) ((pad/left (scale-width st) str) st))))
+              ((center)
+               (lambda (str) (lambda (st) ((pad/both (scale-width st) str) st))))
+              (else
+               (lambda (str) (lambda (st) ((pad/right (scale-width st) str) st)))))
+            (case align
+              ((right) (lambda (str) (pad/left width str)))
+              ((center) (lambda (str) (pad/both width str)))
+              (else (lambda (str) (pad/right width str))))))
       (define (affix x)
         (cond
-          ((pair? tail)
-           (lambda (str)
-             (cat (string-concatenate prefix)
-                  (x str)
-                  (string-concatenate tail))))
-          ((pair? prefix)
-           (lambda (str) (cat (string-concatenate prefix) (x str))))
-          (else x)))
+         ((pair? tail)
+          (lambda (str)
+            (cat (string-concatenate prefix)
+                 (x str)
+                 (string-concatenate tail))))
+         ((pair? prefix)
+          (lambda (str) (cat (string-concatenate prefix) (x str))))
+         (else x)))
       (list
        ;; line formatter
        (affix
-        (if (and last? (not (pair? tail)) (eq? align 'left))
-            dsp
-            (if (proportional-width? width)
-                (case align
-                  ((right)
-                   (lambda (str) (lambda (st) ((pad/left (scale-width st) str) st))))
-                  ((center)
-                   (lambda (str) (lambda (st) ((pad/both (scale-width st) str) st))))
-                  (else
-                   (lambda (str) (lambda (st) ((pad/right (scale-width st) str) st)))))
-                (case align
-                  ((right) (lambda (str) (pad/left width str)))
-                  ((center) (lambda (str) (pad/both width str)))
-                  (else (lambda (str) (pad/right width str)))))))
+        (let ((pad (padder)))
+          (if (and last? (not (pair? tail)) (eq? align 'left))
+              (lambda (str)
+                (lambda (st)
+                  (((if (whitespace-pad? st) dsp pad) str) st)))
+              pad)))
        ;; generator
-       (if (< 0 width 1)
+       (if (proportional-width? width)
            (lambda (st) ((with-width (scale-width st) gen) st))
            (with-width width gen))
        infinite?
@@ -158,7 +168,8 @@
            (denom (- (length ls) (+ (length fixed-ls) (length scaled-ls))))
            (rest (if (zero? denom)
                      0
-                     (/ (- 1 (fold + 0 (map car scaled-ls))) denom))))
+                     (exact->inexact
+                      (/ (- 1 (fold + 0 (map car scaled-ls))) denom)))))
       (if (negative? rest)
           (error "fractional widths must sum to less than 1"
                  (map car scaled-ls)))
@@ -173,40 +184,75 @@
   (let lp ((ls ls) (strs '()) (align 'left) (infinite? #f)
            (width #t) (border-width 0) (res '()))
     (cond
-      ((null? ls)
-       (if (pair? strs)
-           (finish (cons (cons (caar res)
-                               (cons #t (cons (append (reverse strs)
-                                                      (caddar res))
-                                              (cdddar res))))
-                         (cdr res))
-                   border-width)
-           (finish (cons (cons (caar res) (cons #t (cddar res))) (cdr res))
-                   border-width)))
-      ((string? (car ls))
-       (if (string-index (car ls) #\newline)
-           (error "column string literals can't contain newlines")
-           (lp (cdr ls) (cons (car ls) strs) align infinite?
-               width (+ border-width (string-length (car ls))) res)))
-      ((number? (car ls))
-       (lp (cdr ls) strs align infinite? (car ls) border-width res))
-      ((eq? (car ls) 'infinite)
-       (lp (cdr ls) strs align #t width border-width res))
-      ((symbol? (car ls))
-       (lp (cdr ls) strs (car ls) infinite? width border-width res))
-      ((procedure? (car ls))
-       (lp (cdr ls) '() 'left #f #t border-width
-           (cons (list width #f '() (car ls) (reverse strs) align infinite?)
-                 res)))
-      (else
-       (error "invalid column" (car ls))))))
+     ((null? ls)
+      (if (pair? strs)
+          (finish (cons (cons (caar res)
+                              (cons #t (cons (append (reverse strs)
+                                                     (caddar res))
+                                             (cdddar res))))
+                        (cdr res))
+                  border-width)
+          (finish (cons (cons (caar res) (cons #t (cddar res))) (cdr res))
+                  border-width)))
+     ((string? (car ls))
+      (if (string-index (car ls) #\newline)
+          (error "column string literals can't contain newlines")
+          (lp (cdr ls) (cons (car ls) strs) align infinite?
+              width (+ border-width (string-length (car ls))) res)))
+     ((number? (car ls))
+      (lp (cdr ls) strs align infinite? (car ls) border-width res))
+     ((eq? (car ls) 'infinite)
+      (lp (cdr ls) strs align #t width border-width res))
+     ((symbol? (car ls))
+      (lp (cdr ls) strs (car ls) infinite? width border-width res))
+     ((procedure? (car ls))
+      (lp (cdr ls) '() 'left #f #t border-width
+          (cons (list width #f '() (car ls) (reverse strs) align infinite?)
+                res)))
+     (else
+      (error "invalid column" (car ls))))))
+
+(define (max-line-width string-width str)
+  (let lp ((i 0) (hi 0))
+    (let ((j (string-index str #\newline i)))
+      (if j
+          (lp (+ j 1) (max hi (string-width (substring str i j))))
+          (max hi (string-width (substring str i (string-length str))))))))
+
+(define (pad-finite st proc width)
+  (let* ((str ((fmt-to-string proc) (copy-fmt-state st)))
+         (w (max-line-width (or (fmt-string-width st) string-length) str)))
+    (list (cat str)
+          (if (and (integer? width) (exact? width))
+              (max width w)
+              w))))
+
+(define (tabular . ls)
+  (lambda (st)
+    (let lp ((ls ls) (infinite? #f) (width #t) (res '()))
+      (cond
+       ((null? ls)
+        ((apply columnar (reverse res)) st))
+       ((number? (car ls))
+        (lp (cdr ls) infinite? (car ls) res))
+       ((eq? 'infinite (car ls))
+        (lp (cdr ls) #t width (cons (car ls) res)))
+       ((procedure? (car ls))
+        (if infinite?
+            (if width
+                (lp (cdr ls) #f #t (cons (car ls) (cons width res)))
+                (lp (cdr ls) #f #t (cons (car ls) res)))
+            (let ((gen+width (pad-finite st (car ls) width)))
+              (lp (cdr ls) #f #t (append gen+width res)))))
+       (else
+        (lp (cdr ls) infinite? width (cons (car ls) res)))))))
 
 ;; break lines only, don't fmt-join short lines or justify
 (define (fold-lines . ls)
   (lambda (st)
     (define output (fmt-writer st))
     (define (kons-in-line str st)
-      (let ((len (string-length str))
+      (let ((len ((or (fmt-string-width st) string-length) str))
             (space (- (fmt-width st) (fmt-col st))))
         (cond
           ((or (<= len space) (not (positive? space)))
@@ -235,14 +281,14 @@
 
 (define (wrap-fold-words seq knil max-width get-width line . o)
   (let* ((last-line (if (pair? o) (car o) line))
-         (vec (if (pair? seq) (list->vector seq) seq))
+         (vec (if (list? seq) (list->vector seq) seq))
          (len (vector-length vec))
          (len-1 (- len 1))
          (breaks (make-vector len #f))
          (penalties (make-vector len #f))
          (widths
           (list->vector
-           (map get-width (if (pair? seq) seq (vector->list seq))))))
+           (map get-width (if (list? seq) seq (vector->list vec))))))
     (define (largest-fit i)
       (let lp ((j (+ i 1)) (width (vector-ref widths i)))
         (let ((width (+ width 1 (vector-ref widths j))))
@@ -256,6 +302,7 @@
         ((vector-ref penalties i))
         (else
          (vector-set! penalties i (expt (+ max-width 1) 3))
+         (vector-set! breaks i i)
          (let ((k (largest-fit i)))
            (let lp ((j i) (width 0))
              (if (<= j k)
@@ -276,16 +323,21 @@
         (if (> i j)
             (reverse res)
             (lp (+ i 1) (cons (vector-ref vec i) res)))))
-    ;; compute optimum breaks
-    (vector-set! breaks len-1 len-1)
-    (vector-set! penalties len-1 0)
-    (min-penalty! 0)
-    ;; fold
-    (let lp ((i 0) (acc knil))
-      (let ((break (vector-ref breaks i)))
-        (if (>= break len-1)
-            (last-line (sub-list i len-1) acc)
-            (lp (+ break 1) (line (sub-list i break) acc)))))))
+    (cond
+     ((zero? len)
+      ;; degenerate case
+      (last-line '() knil))
+     (else
+      ;; compute optimum breaks
+      (vector-set! breaks len-1 len-1)
+      (vector-set! penalties len-1 0)
+      (min-penalty! 0)
+      ;; fold
+      (let lp ((i 0) (acc knil))
+        (let ((break (vector-ref breaks i)))
+          (if (>= break len-1)
+              (last-line (sub-list i len-1) acc)
+              (lp (+ break 1) (line (sub-list i break) acc)))))))))
 
 ;; XXXX don't split, traverse the string manually and keep track of
 ;; sentence endings so we can insert two spaces
@@ -303,21 +355,29 @@
       (apply-cat ls))
      st)
     (wrap-fold (string-concatenate-reverse buffer)
-               st (fmt-width st) string-length print-line)))
+               st (fmt-width st)
+               (or (fmt-string-width st) string-length)
+               print-line)))
 
 (define (justify . ls)
   (lambda (st)
     (let ((width (fmt-width st))
+          (string-width (or (fmt-string-width st) string-length))
           (output (fmt-writer st))
           (buffer '()))
       (define (justify-line ls st)
         (if (null? ls)
             (nl st)
-            (let* ((sum (fold (lambda (s n) (+ n (string-length s))) 0 ls))
+            (let* ((sum (fold (lambda (s n) (+ n (string-width s))) 0 ls))
                    (len (length ls))
                    (diff (max 0 (- width sum)))
-                   (sep (make-string (quotient diff (- len 1)) #\space))
-                   (rem (remainder diff (- len 1))))
+                   (sep (make-string (if (= len 1)
+                                         0
+                                         (quotient diff (- len 1)))
+                                     #\space))
+                   (rem (if (= len 1)
+                            diff
+                            (remainder diff (- len 1)))))
               (output
                (call-with-output-string
                  (lambda (p)
@@ -339,7 +399,7 @@
         (apply-cat ls))
        st)
       (wrap-fold (string-concatenate-reverse buffer)
-                 st width string-length justify-line justify-last))))
+                 st width string-width justify-line justify-last))))
 
 (define (fmt-file path)
   (lambda (st)

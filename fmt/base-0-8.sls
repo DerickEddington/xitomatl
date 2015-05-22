@@ -2,7 +2,7 @@
 ;; Copyright 2009 Derick Eddington.  My MIT-style license is in the file named
 ;; LICENSE from the original collection this file is distributed with.
 
-(library (xitomatl fmt base (0 7))
+(library (xitomatl fmt base (0 8))
   (export
     call-with-output-string
     make-eq?-table
@@ -161,6 +161,6 @@
               ((< n bot) (lp (* n base) (- e 1)))
               (else (list n e))))))))
 
-  (SRFI-23-error->R6RS "(library (xitomatl fmt base (0 7)))"
+  (SRFI-23-error->R6RS "(library (xitomatl fmt base (0 8)))"
    (include/resolve ("xitomatl" "fmt") "fmt.scm"))
 )

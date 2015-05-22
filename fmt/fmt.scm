@@ -229,7 +229,8 @@
                         (if (> (+ (- nli i) col) width)
                             (return ((apply fmt-try-fit fail) orig-st))
                             (lp (+ nli 1) 0))
-                        (let* ((len (string-length str))
+                        (let* ((len ((or (fmt-string-width st) string-length)
+                                     str))
                                (col (+ (- len i) col)))
                           (if (> col width)
                               (return ((apply fmt-try-fit fail) orig-st))
@@ -270,7 +271,8 @@
              (and str
                   (lp (cdr ls)
                       (cons str res)
-                      (max (string-length str) widest)))))
+                      (max ((or (fmt-string-width st) string-length) str)
+                           widest)))))
           ((null? ls) (cons widest (reverse res)))
           (else #f))))))
 
@@ -646,7 +648,7 @@
                                    ((char? prefix) (string prefix))
                                    (else "")))
                      (diff (- align
-                              (+ (if (zero? k) 1 k) (string-length prefix))
+                              (+ (if (<= k 0) 1 k) (string-length prefix))
                               1)))
                 (if (positive? diff)
                     (display (make-string diff (fmt-pad-char st)) port))

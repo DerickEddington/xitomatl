@@ -2,7 +2,7 @@
 ;; Copyright 2009 Derick Eddington.  My MIT-style license is in the file named
 ;; LICENSE from the original collection this file is distributed with.
 
-(library (xitomatl fmt c (0 7))
+(library (xitomatl fmt c (0 8))
   (export
     fmt-in-macro? fmt-expression? fmt-return? fmt-default-type
     fmt-newline-before-brace? fmt-braceless-bodies?
@@ -28,11 +28,11 @@
     c-comment c-block-comment)
   (import
     (rename (rnrs) (for-all every))
-    (only (srfi :13 strings) substring/shared string-index)
+    (only (srfi :13 strings) substring/shared string-index string-index-right)
     (srfi :23 error tricks)
     (xitomatl include)
-    (xitomatl fmt base (0 7)))
+    (xitomatl fmt base (0 8)))
 
-  (SRFI-23-error->R6RS "(library (xitomatl fmt c (0 7)))"
+  (SRFI-23-error->R6RS "(library (xitomatl fmt c (0 8)))"
    (include/resolve ("xitomatl" "fmt") "fmt-c.scm"))
 )

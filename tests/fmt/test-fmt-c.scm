@@ -218,7 +218,7 @@
 
 extern int foo ();
 
-#endif /* ! FOO_H */
+#endif  /* ! FOO_H */
 "
     (fmt #f (cpp-wrap-header
              'FOO_H
@@ -238,7 +238,7 @@ extern int foo ();
     case 2:
         x = 4;
         break;
-#endif /* H_TWO */
+#endif  /* H_TWO */
     default:
         x = 5;
         break;
